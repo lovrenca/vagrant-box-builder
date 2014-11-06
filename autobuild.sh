@@ -1,42 +1,66 @@
 #!/bin/bash
 #Welcome to Kendu-BOX autobuilder
 
+set -e
+
 ###############################---VARIABLES---##################################
 
 BOXNAME="kendubox"                 #Name ofthe virtual machine
 BOXDIRECTORY="$(pwd)"
-BOXSERIAL="001"
-NEWBOXNAME="${BOXNAME}-${BOXSERIAL}"
 VBOXUNAME="vagrant"
 VBOXKEYFILE="keys/id_rsa"
-BOXDISK="${BOXDIRECTORY}/${NEWBOXNAME}/${NEWBOXNAME}-disk1.vdi"
+NEWDISK=~/VirtualBox\ VMs/${BOXNAME}/${BOXNAME}-disk1.vdi
+OLDDISK=~/VirtualBox\ VMs/${BOXNAME}/${BOXNAME}-disk2.vmdk
+BOXPATH="/opt/web/vagrant"
 
 ################################################################################
 
 ###############################---FUNCTIONS---##################################
 
-function clone(){
-    echo " > Cloning image ${BOXNAME}: creating ${NEWBOXNAME}"
-    mkdir -p "${BOXDIRECTORY}/${NEWBOXNAME}"
-    vboxmanage clonevm \
-        --name ${NEWBOXNAME} \
-        --basefolder "${BOXDIRECTORY}" \
-        --mode machine \
-        --register \
-        ${BOXNAME}
-
+function import() {
+    #Import vm and ormat diskfile to vdi
+    echo " > Importing virtual machine"
+    vboxmanage import "${BOXNAME}.ova"
+    echo " > Converting VM HD to .vdi"
+    vboxmanage clonehd --format VDI \
+        "${OLDDISK}" \
+        "${NEWDISK}"
+    echo " > registering new disk"
+    vboxmanage storageattach ${BOXNAME} --storagectl SATA --port 0 --type hdd --medium "${NEWDISK}"
 }
 
 function start() {
-    echo " > Starting virtualmachine ${NEWBOXNAME}"
-    vboxmanage modifyvm ${NEWBOXNAME} --natpf1 delete ssh
-    vboxmanage modifyvm ${NEWBOXNAME} --natpf1 "ssh, tcp,,22222,,22"
-    vboxmanage startvm --type headless kendubox-001
+    #Set port forward to make ssh accessible, and start the vm.
+    echo " > Setting NAT rule"
+    vboxmanage modifyvm ${BOXNAME} --natpf1 "ssh, tcp,,22222,,22" || true
+    echo " > Starting virtualmachine ${BOXNAME}"
+    vboxmanage startvm --type headless ${BOXNAME}
+    counter=1;
+    while true
+    do
+         ssh -p 22222 vagrant@localhost \
+            -o UserKnownHostsFile=/dev/null \
+            -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=1 \
+            -i ${VBOXKEYFILE} \
+            true >> /dev/null && \
+         echo " > VM started sucsesfully" && \
+         break || echo "."
+         echo "* Probing VM, attempt $counter"
+         sleep 1
+         counter=$((counter+1))
+         if [ "$counter" -gt "30" ]
+         then
+            exit 1
+        fi
+    done
 }
 
 function setup() {
+    #Install all necessary opackets and update all
     echo " > Setting up th box"
     scp -P 22222 -i ${VBOXKEYFILE} setup.sh vagrant@localhost:
+    ssh -p 22222 vagrant@localhost -i ${VBOXKEYFILE} chmod +x setup.sh
     ssh -p 22222 vagrant@localhost -i ${VBOXKEYFILE} sudo ./setup.sh
     ssh -p 22222 vagrant@localhost -i ${VBOXKEYFILE} rm setup.sh
 }
@@ -44,34 +68,50 @@ function setup() {
 function zerofree() {
     #Zero free space
     echo " > Zerofreing space"
-    ssh -p 22222 -i ${VBOXKEYFILE} vagrant@localhost  sudo dd if=/dev/zero of=/void bs=1M
+    ssh -p 22222 -i ${VBOXKEYFILE} vagrant@localhost  sudo dd if=/dev/zero of=/void bs=1M || true
     ssh -p 22222 -i ${VBOXKEYFILE} vagrant@localhost  sudo rm /void
 }
 
 function shrinkdisk() {
     #Shrink disk
-    vboxmanage modifyhd ${BOXDISK} --compact
+    echo " > Shrinking disk"
+    vboxmanage modifyhd "${NEWDISK}" --compact
 }
 
 function package() {
-    echo " > packaging the box"
-    vagrant package --base ${NEWBOXNAME}
+    echo " > Packaging box"
+    vagrant package --base ${BOXNAME}
 }
+
 function deploy() {
     echo " > deploying new build"
+    mv "${BOXPATH}/${BOXNAME}.box" "${BOXPATH}/${BOXNAME}.old"
+    mv package.box "${BOXPATH}/${BOXNAME}.box"
 }
 
 function stop() {
-    VBoxManage controlvm ${NEWBOXNAME} poweroff
+    echo " > Stopping VM"
+    VBoxManage controlvm ${BOXNAME} poweroff
+    vboxmanage modifyvm ${BOXNAME} --natpf1 delete ssh
 }
-#get ip
-#vboxmanage guestproperty get ${NEWBOXNAME} /VirtualBox/GuestInfo/Net/0/V4/IP
+
+function delete() {
+    echo " > Deleting VM"
+    vboxmanage unregistervm ${BOXNAME} --delete
+}
 
 ################################################################################
 
 ###############################----ACTION-----##################################
 
+import
+start
+setup
+zerofree
+stop
+shrinkdisk
+package
+deploy
+delete
 
 ################################################################################
-
-$1
