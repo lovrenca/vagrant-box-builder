@@ -1,5 +1,5 @@
 #!/bin/bash
-#Welcome to Kendu-BOX autobuilder
+#Welcome to vagrant-BOX autobuilder
 
 set -e
 
@@ -11,7 +11,7 @@ VBOXUNAME="vagrant"
 VBOXKEYFILE="keys/id_rsa"
 NEWDISK=~/VirtualBox\ VMs/${BOXNAME}/${BOXNAME}-disk1.vdi
 OLDDISK=~/VirtualBox\ VMs/${BOXNAME}/${BOXNAME}-disk2.vmdk
-BOXPATH="/opt/web/vagrant"
+BOXPATH="/opt/web/vagrant"              #Where is the box published
 
 ################################################################################
 
@@ -36,6 +36,7 @@ function start() {
     echo " > Starting virtualmachine ${BOXNAME}"
     vboxmanage startvm --type headless ${BOXNAME}
     counter=1;
+    #Probe VM untill it's up or die trying
     while true
     do
          ssh -p 22222 vagrant@localhost \
@@ -43,7 +44,7 @@ function start() {
             -o StrictHostKeyChecking=no \
             -o ConnectTimeout=1 \
             -i ${VBOXKEYFILE} \
-            true >> /dev/null && \
+            true 2> /dev/null && \
          echo " > VM started sucsesfully" && \
          break || echo "."
          echo "* Probing VM, attempt $counter"
@@ -58,7 +59,7 @@ function start() {
 
 function setup() {
     #Install all necessary opackets and update all
-    echo " > Setting up th box"
+    echo " > Setting up the box"
     scp -P 22222 -i ${VBOXKEYFILE} setup.sh vagrant@localhost:
     ssh -p 22222 vagrant@localhost -i ${VBOXKEYFILE} chmod +x setup.sh
     ssh -p 22222 vagrant@localhost -i ${VBOXKEYFILE} sudo ./setup.sh
@@ -69,7 +70,9 @@ function zerofree() {
     #Zero free space
     echo " > Zerofreing space"
     ssh -p 22222 -i ${VBOXKEYFILE} vagrant@localhost  sudo dd if=/dev/zero of=/void bs=1M || true
-    ssh -p 22222 -i ${VBOXKEYFILE} vagrant@localhost  sudo rm /void
+    sleep 1
+    echo " > Removing the void"
+    ssh -p 22222 -i ${VBOXKEYFILE} vagrant@localhost  sudo rm -f /void
 }
 
 function shrinkdisk() {

@@ -7,15 +7,6 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 
 #Add repos:
-# Latest NginX
-echo "deb http://nginx.org/packages/ubuntu/     trusty nginx
-deb-src http://nginx.org/packages/ubuntu/       trusty nginx" >> /etc/apt/sources.list.d/nginx.latest
-
-#php repo
-echo "deb http://ppa.launchpad.net/ondrej/php5-5.6/ubuntu trusty main " \
-    > /etc/apt/sources.list.d/ondrej.list
-apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E5267A6C
-
 #Docker repo:
 apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 36A1D7869245C8950F966E92D8576A8BA88D21E9
 sh -c "echo deb https://get.docker.com/ubuntu docker main\
@@ -29,7 +20,7 @@ apt-get install --yes --force-yes \
     curl \
     git \
     nginx \
-    php5=5.6.* \
+    php5 \
     php5-fpm \
     php5-common \
     php5-curl \
