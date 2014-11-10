@@ -64,16 +64,16 @@ function setup() {
     ssh -p 22222 vagrant@localhost -i ${VBOXKEYFILE} chmod +x setup.sh
     ssh -p 22222 vagrant@localhost -i ${VBOXKEYFILE} sudo ./setup.sh
     ssh -p 22222 vagrant@localhost -i ${VBOXKEYFILE} rm setup.sh
+    ssh -p 22222 vagrant@localhost -i ${VBOXKEYFILE} 'echo $(date) > buildstamp'
 }
 
 function zerofree() {
     #Zero free space
     echo " > Zerofreing space"
-    ssh -p 22222 -i ${VBOXKEYFILE} vagrant@localhost  sudo dd if=/dev/zero of=/void bs=1M || true
-    sleep 1
-    echo " > Removing the void"
-    ssh -p 22222 -i ${VBOXKEYFILE} vagrant@localhost  sudo rm -f /void
-}
+    ssh -p 22222 -i ${VBOXKEYFILE} vagrant@localhost  'sudo dd if=/dev/zero of=/void bs=1M || true'
+    ssh -p 22222 -i ${VBOXKEYFILE} vagrant@localhost  'sudo rm -f /void'
+    #Sync to assure void is removed.
+    ssh -p 22222 -i ${VBOXKEYFILE} vagrant@localhost 'sudo sync'}
 
 function shrinkdisk() {
     #Shrink disk
@@ -83,6 +83,8 @@ function shrinkdisk() {
 
 function package() {
     echo " > Packaging box"
+    #remove a potentially left behind package from a failed build
+    rm -f package.box
     vagrant package --base ${BOXNAME}
 }
 
@@ -107,14 +109,30 @@ function delete() {
 
 ###############################----ACTION-----##################################
 
-import
-start
-setup
-zerofree
-stop
-shrinkdisk
-package
-deploy
-delete
+action=${1:-"all"}
+
+case $action in
+    "import"|"start"|"setup"|"zerofree"|"stop"|"shrinkdisk"|"package"|"deploy"|"delete")
+    $1
+    ;;
+
+    "all")
+    import
+    start
+    setup
+    zerofree
+    stop
+    shrinkdisk
+    package
+    deploy
+    delete
+    ;;
+
+    *)
+    echo "RTFM!"
+    ;;
+
+esac
+
 
 ################################################################################
