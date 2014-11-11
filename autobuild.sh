@@ -73,7 +73,8 @@ function zerofree() {
     ssh -p 22222 -i ${VBOXKEYFILE} vagrant@localhost  'sudo dd if=/dev/zero of=/void bs=1M || true'
     ssh -p 22222 -i ${VBOXKEYFILE} vagrant@localhost  'sudo rm -f /void'
     #Sync to assure void is removed.
-    ssh -p 22222 -i ${VBOXKEYFILE} vagrant@localhost 'sudo sync'}
+    ssh -p 22222 -i ${VBOXKEYFILE} vagrant@localhost 'sudo sync'
+}
 
 function shrinkdisk() {
     #Shrink disk
@@ -110,6 +111,7 @@ function delete() {
 ###############################----ACTION-----##################################
 
 action=${1:-"all"}
+chmod 600 ${VBOXKEYFILE}
 
 case $action in
     "import"|"start"|"setup"|"zerofree"|"stop"|"shrinkdisk"|"package"|"deploy"|"delete")
