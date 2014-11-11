@@ -42,3 +42,9 @@ apt-get install --yes --force-yes \
 
 apt-get clean
 pip install -U fig
+
+#add vagrant to docker group
+gpasswd -a vagrant docker
+
+#Remove an annoying bug:
+sed -i 's/^mesg n$/tty -s \&\& mesg n/g' /root/.profile
