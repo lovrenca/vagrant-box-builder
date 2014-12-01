@@ -110,6 +110,7 @@ function delete() {
 
 ###############################----ACTION-----##################################
 
+cd $( dirname $0 )
 action=${1:-"all"}
 chmod 600 ${VBOXKEYFILE}
 
